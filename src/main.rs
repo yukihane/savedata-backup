@@ -23,8 +23,8 @@ fn main() -> Result<()> {
         })
         .filter_map(|e| {
             if e.file_type().is_file() {
-                if let Some(x) = e.path().parent() {
-                    Some(x.to_owned())
+                if let Some(path) = e.path().parent() {
+                    Some(path.to_owned())
                 } else {
                     None
                 }
