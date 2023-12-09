@@ -1,7 +1,14 @@
-use std::{collections::BTreeSet, env, path::Path, vec};
+use std::{
+    collections::BTreeSet,
+    env,
+    fs::{File, OpenOptions},
+    io::{BufReader, BufWriter, Write},
+    path::Path,
+    vec,
+};
 
 use anyhow::{Context, Result};
-use directories::UserDirs;
+use directories::{ProjectDirs, UserDirs};
 use getopts::Options;
 use walkdir::WalkDir;
 
@@ -23,12 +30,16 @@ fn main() -> Result<()> {
         None
     };
 
+    let config_file = ProjectDirs::from("com", "yukihane", "savedata-backup")
+        .context("Not found: config_file")?
+        .config_dir()
+        .join("config.txt");
+
+    println!("config_file: {}", config_file.display());
+
     match command.as_ref().map(|e| e.as_str()) {
-        Some("search") => generate_targets()?,
-        Some("backup") => {
-            let file = matches.opt_str("f").context("Not found: file")?;
-            backup(&file)?
-        }
+        Some("search") => generate_targets(&config_file)?,
+        Some("backup") => backup(&config_file)?,
         _ => {
             print_usage(&program, &opts);
         }
@@ -41,13 +52,18 @@ fn print_usage(program: &str, opts: &Options) {
     print!("{}", opts.usage(&brief));
 }
 
-fn backup(file: &str) -> Result<()> {
-    println!("backup: {}", file);
+fn backup(config_file: &Path) -> Result<()> {
+    println!("backup: {}", config_file.display());
     Ok(())
 }
 
 /// バックアップ対象ディレクトリを推定します。
-fn generate_targets() -> Result<()> {
+fn generate_targets(config_file: &Path) -> Result<()> {
+    let config_dir = config_file.parent().context("Not found: config_dir")?;
+    if !config_dir.exists() {
+        std::fs::create_dir_all(config_dir)?;
+    }
+
     let user_dir = UserDirs::new().context("Not found: user_dir")?;
     let dir = user_dir.document_dir().context("Not found: document_dir")?;
 
@@ -91,7 +107,25 @@ fn generate_targets() -> Result<()> {
         }
     }
 
-    save_dirs.iter().for_each(|e| println!("{}", e.display()));
+    // save_dirs.iter().for_each(|e| println!("{}", e.display()));
+
+    let mut config_file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(config_file)?;
+    let mut writer = BufWriter::new(&mut config_file);
+
+    save_dirs.iter().for_each(|e| {
+        writer.write_all(e.to_string_lossy().as_bytes()).unwrap();
+        writer.write_all(b"\n").unwrap();
+    });
+
+    writer.flush().unwrap();
+
+    // save_dirs.iter().for_each(|e| {
+    //     writeln!(config_file, "{}", e.display()).unwrap();
+    // });
 
     Ok(())
 }
