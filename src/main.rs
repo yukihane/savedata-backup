@@ -1,11 +1,48 @@
-use std::{collections::BTreeSet, path::Path, vec};
+use std::{collections::BTreeSet, env, path::Path, vec};
 
 use anyhow::{Context, Result};
 use directories::UserDirs;
+use getopts::Options;
 use walkdir::WalkDir;
 
 fn main() -> Result<()> {
-    generate_targets()?;
+    let args = env::args().collect::<Vec<_>>();
+    let program = args[0].clone();
+
+    let mut opts = Options::new();
+    opts.optopt("f", "", "backup target file", "FILE");
+
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => m,
+        Err(e) => panic!("{}", e),
+    };
+
+    let command = if !matches.free.is_empty() {
+        Some(matches.free[0].clone())
+    } else {
+        None
+    };
+
+    match command.as_ref().map(|e| e.as_str()) {
+        Some("search") => generate_targets()?,
+        Some("backup") => {
+            let file = matches.opt_str("f").context("Not found: file")?;
+            backup(&file)?
+        }
+        _ => {
+            print_usage(&program, &opts);
+        }
+    }
+    return Ok(());
+}
+
+fn print_usage(program: &str, opts: &Options) {
+    let brief = format!("Usage:\n{} search\n{} backup -f FILE", program, program);
+    print!("{}", opts.usage(&brief));
+}
+
+fn backup(file: &str) -> Result<()> {
+    println!("backup: {}", file);
     Ok(())
 }
 
