@@ -1,3 +1,6 @@
+use directories::UserDirs;
+
 fn main() {
-    println!("Hello, world!");
+    let user_dir = UserDirs::new().unwrap();
+    let dir = user_dir.document_dir().unwrap();
 }
