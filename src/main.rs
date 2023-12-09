@@ -9,6 +9,12 @@ use directories::UserDirs;
 use walkdir::WalkDir;
 
 fn main() -> Result<()> {
+    generate_targets()?;
+    Ok(())
+}
+
+/// バックアップ対象ディレクトリを推定します。
+fn generate_targets() -> Result<()> {
     let user_dir = UserDirs::new().context("Not found: user_dir")?;
     let dir = user_dir.document_dir().context("Not found: document_dir")?;
 
