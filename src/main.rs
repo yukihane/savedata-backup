@@ -18,7 +18,7 @@ fn generate_targets() -> Result<()> {
     let user_dir = UserDirs::new().context("Not found: user_dir")?;
     let dir = user_dir.document_dir().context("Not found: document_dir")?;
 
-    let new_dir = WalkDir::new(dir)
+    let filtered_paths = WalkDir::new(dir)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| {
@@ -42,11 +42,13 @@ fn generate_targets() -> Result<()> {
         })
         .collect::<BTreeSet<_>>();
 
-    new_dir.iter().for_each(|e| println!("{}", e.display()));
+    // filtered_paths
+    //     .iter()
+    //     .for_each(|e| println!("{}", e.display()));
 
     let mut maybe_parent: Option<&Path> = None;
     let mut save_dirs = vec![];
-    for dir in new_dir.iter() {
+    for dir in filtered_paths.iter() {
         let is_parent = is_parent(&maybe_parent, &dir);
         if is_parent {
             continue;
@@ -56,7 +58,7 @@ fn generate_targets() -> Result<()> {
         }
     }
 
-    // save_dirs.iter().for_each(|e| println!("{}", e.display()));
+    save_dirs.iter().for_each(|e| println!("{}", e.display()));
 
     Ok(())
 }
