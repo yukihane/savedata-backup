@@ -1,8 +1,4 @@
-use std::{
-    collections::{BTreeSet, HashSet},
-    path::Path,
-    vec,
-};
+use std::{collections::BTreeSet, path::Path, vec};
 
 use anyhow::{Context, Result};
 use directories::UserDirs;
