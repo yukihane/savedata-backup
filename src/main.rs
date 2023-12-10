@@ -23,7 +23,23 @@ enum Command {
     Backup,
 }
 
-fn determine_command() -> (Option<Command>, String, Options) {
+fn main() -> Result<()> {
+    let command = determine_command();
+
+    let ctx = initialize_context()?;
+
+    match command {
+        Some(Command::Search) => save_archive_candidates(&ctx)?,
+        Some(Command::Backup) => backup(&ctx)?,
+        None => {
+            initialize_config_if_not_exists(&ctx)?;
+            println!("use: {}", ctx.search_dir_file.display());
+        }
+    }
+    return Ok(());
+}
+
+fn determine_command() -> Option<Command> {
     let args = env::args().collect::<Vec<_>>();
     let program = args[0].clone();
 
@@ -35,17 +51,16 @@ fn determine_command() -> (Option<Command>, String, Options) {
         Err(e) => panic!("{}", e),
     };
 
-    let command = if !matches.free.is_empty() {
+    if !matches.free.is_empty() {
         match matches.free[0] {
             ref s if s == "search" => Some(Command::Search),
             ref s if s == "backup" => Some(Command::Backup),
             _ => None,
         }
     } else {
+        print_usage(&program, &opts);
         None
-    };
-
-    (command, program, opts)
+    }
 }
 
 fn initialize_context() -> Result<AppContext> {
@@ -62,25 +77,6 @@ fn initialize_context() -> Result<AppContext> {
         search_dir_file,
         target_dir_file,
     })
-}
-
-fn main() -> Result<()> {
-    let (command, program, opts) = determine_command();
-
-    let ctx = initialize_context()?;
-
-    println!("target_file: {}", &ctx.target_dir_file.display());
-
-    match command {
-        Some(Command::Search) => generate_targets2(&ctx)?,
-        Some(Command::Backup) => backup(&ctx)?,
-        None => {
-            print_usage(&program, &opts);
-            initialize_config_if_not_exists(&ctx)?;
-            println!("use: {}", ctx.search_dir_file.display());
-        }
-    }
-    return Ok(());
 }
 
 fn initialize_config_if_not_exists(ctx: &AppContext) -> Result<()> {
@@ -104,7 +100,8 @@ fn initialize_config_if_not_exists(ctx: &AppContext) -> Result<()> {
     Ok(())
 }
 
-fn generate_targets2(ctx: &AppContext) -> Result<()> {
+/// アーカイブ対象となるディレクトリの候補を推定し、ファイルに書き出します。
+fn save_archive_candidates(ctx: &AppContext) -> Result<()> {
     let search_dir_file = &ctx.search_dir_file;
     if !search_dir_file.exists() {
         return Err(anyhow::anyhow!("Not found: {}", search_dir_file.display()));
@@ -121,17 +118,17 @@ fn generate_targets2(ctx: &AppContext) -> Result<()> {
 
     let targets = search_paths
         .iter()
-        .map(|search_path| generate_targets(&search_path).unwrap())
+        .map(|search_path| search_archive_targets(&search_path).unwrap())
         .flatten()
         .collect::<Vec<_>>();
 
-    save_targets(&ctx, &targets)?;
+    save_dirs(&ctx, &targets)?;
 
     Ok(())
 }
 
-/// バックアップ対象ディレクトリを推定します。
-fn generate_targets(search_path: &Path) -> Result<Vec<PathBuf>> {
+/// `search_path` 以下に存在するバックアップ対象ディレクトリを推定します。
+fn search_archive_targets(search_path: &Path) -> Result<Vec<PathBuf>> {
     let filtered_paths = WalkDir::new(search_path)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -175,7 +172,8 @@ fn generate_targets(search_path: &Path) -> Result<Vec<PathBuf>> {
     return Ok(save_dirs);
 }
 
-fn save_targets(ctx: &AppContext, save_targets: &Vec<PathBuf>) -> Result<()> {
+/// 推定したバックアップ対象ディレクトリをファイルに書き出します。
+fn save_dirs(ctx: &AppContext, save_targets: &Vec<PathBuf>) -> Result<()> {
     // save_dirs.iter().for_each(|e| println!("{}", e.display()));
 
     let mut target_file = OpenOptions::new()
