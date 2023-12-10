@@ -1,7 +1,6 @@
 use std::{
     collections::BTreeSet,
     env,
-    ffi::OsStr,
     fs::{self, File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Write},
     path::{Component, Path, PathBuf, Prefix},
@@ -11,7 +10,6 @@ use std::{
 use anyhow::{Context, Result};
 use directories::{ProjectDirs, UserDirs};
 use getopts::Options;
-use tar::Archive;
 use walkdir::WalkDir;
 
 fn main() -> Result<()> {
@@ -32,16 +30,16 @@ fn main() -> Result<()> {
         None
     };
 
-    let config_file = ProjectDirs::from("com", "yukihane", "savedata-backup")
-        .context("Not found: config_file")?
+    let target_file = ProjectDirs::from("com", "yukihane", "savedata-backup")
+        .context("Not found: target_file")?
         .config_dir()
         .join("config.txt");
 
-    println!("config_file: {}", config_file.display());
+    println!("target_file: {}", target_file.display());
 
     match command.as_ref().map(|e| e.as_str()) {
-        Some("search") => generate_targets(&config_file)?,
-        Some("backup") => backup(&config_file)?,
+        Some("search") => generate_targets(&target_file)?,
+        Some("backup") => backup(&target_file)?,
         _ => {
             print_usage(&program, &opts);
         }
@@ -55,8 +53,8 @@ fn print_usage(program: &str, opts: &Options) {
 }
 
 /// バックアップ(tarファイル)を生成します。
-fn backup(config_file: &Path) -> Result<()> {
-    let reader = BufReader::new(File::open(config_file)?);
+fn backup(target_file: &Path) -> Result<()> {
+    let reader = BufReader::new(File::open(target_file)?);
     let paths = reader
         .lines()
         .into_iter()
@@ -111,8 +109,8 @@ fn backup(config_file: &Path) -> Result<()> {
 }
 
 /// バックアップ対象ディレクトリを推定します。
-fn generate_targets(config_file: &Path) -> Result<()> {
-    let config_dir = config_file.parent().context("Not found: config_dir")?;
+fn generate_targets(target_file: &Path) -> Result<()> {
+    let config_dir = target_file.parent().context("Not found: config_dir")?;
     if !config_dir.exists() {
         std::fs::create_dir_all(config_dir)?;
     }
@@ -162,12 +160,12 @@ fn generate_targets(config_file: &Path) -> Result<()> {
 
     // save_dirs.iter().for_each(|e| println!("{}", e.display()));
 
-    let mut config_file = OpenOptions::new()
+    let mut target_file = OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(true)
-        .open(config_file)?;
-    let mut writer = BufWriter::new(&mut config_file);
+        .open(target_file)?;
+    let mut writer = BufWriter::new(&mut target_file);
 
     save_dirs.iter().for_each(|e| {
         writer.write_all(e.to_string_lossy().as_bytes()).unwrap();
@@ -177,7 +175,7 @@ fn generate_targets(config_file: &Path) -> Result<()> {
     writer.flush().unwrap();
 
     // save_dirs.iter().for_each(|e| {
-    //     writeln!(config_file, "{}", e.display()).unwrap();
+    //     writeln!(target_file, "{}", e.display()).unwrap();
     // });
 
     Ok(())
