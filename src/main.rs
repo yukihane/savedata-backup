@@ -85,67 +85,6 @@ fn initialize_config_if_not_exists(ctx: &AppContext) -> Result<()> {
     Ok(())
 }
 
-fn print_usage(program: &str, opts: &Options) {
-    let brief = format!("Usage:\n{} search\n{} backup -f FILE", program, program);
-    print!("{}", opts.usage(&brief));
-}
-
-/// バックアップ(tarファイル)を生成します。
-fn backup(target_file: &Path) -> Result<()> {
-    let reader = BufReader::new(File::open(target_file)?);
-    let paths = reader
-        .lines()
-        .into_iter()
-        .map(|e| {
-            let path = e.unwrap();
-            // println!("{}", path);
-            // Path::new(&path)
-            //     .canonicalize()
-            //     .context("Not found: canonicalize")
-            //     .map(|e| e.to_owned())
-            path
-        })
-        .collect::<Vec<_>>();
-
-    let mut tar_file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open("archive.tar")?;
-    let mut tar = tar::Builder::new(&mut tar_file);
-
-    // let path =
-    //     PathBuf::from(r"C:\Users\yuki\Documents\AQUAPLUS\Utawarerumono Prelude to the Fallen\Save");
-    for path in paths {
-        let path = Path::new(&path);
-
-        let mut iter = path.components().into_iter();
-        let prefix = iter.next().unwrap();
-        let rootdir = iter.next().unwrap();
-        let rel_path = path.strip_prefix(&prefix)?.strip_prefix(&rootdir)?;
-
-        let drive_letter = match prefix {
-            Component::Prefix(prefix_component) => match prefix_component.kind() {
-                Prefix::Disk(drive_letter) => String::from_utf8(vec![drive_letter]).unwrap(),
-                _ => panic!("not disk"),
-            },
-            _ => panic!("not disk"),
-        };
-        let drive_letter = PathBuf::from(drive_letter);
-        let dest = drive_letter.join(rel_path);
-
-        println!("{}", path.display());
-
-        match fs::metadata(&path) {
-            Ok(_) => println!("exists"),
-            Err(_) => println!("not exists"),
-        }
-
-        tar.append_dir_all(&dest, &path)?;
-    }
-    Ok(())
-}
-
 /// バックアップ対象ディレクトリを推定します。
 fn generate_targets(target_file: &Path) -> Result<()> {
     let config_dir = target_file.parent().context("Not found: config_dir")?;
@@ -226,4 +165,65 @@ fn is_parent(maybe_parent: &Option<&Path>, dir: &Path) -> bool {
         }
     }
     false
+}
+
+/// バックアップ(tarファイル)を生成します。
+fn backup(target_file: &Path) -> Result<()> {
+    let reader = BufReader::new(File::open(target_file)?);
+    let paths = reader
+        .lines()
+        .into_iter()
+        .map(|e| {
+            let path = e.unwrap();
+            // println!("{}", path);
+            // Path::new(&path)
+            //     .canonicalize()
+            //     .context("Not found: canonicalize")
+            //     .map(|e| e.to_owned())
+            path
+        })
+        .collect::<Vec<_>>();
+
+    let mut tar_file = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open("archive.tar")?;
+    let mut tar = tar::Builder::new(&mut tar_file);
+
+    // let path =
+    //     PathBuf::from(r"C:\Users\yuki\Documents\AQUAPLUS\Utawarerumono Prelude to the Fallen\Save");
+    for path in paths {
+        let path = Path::new(&path);
+
+        let mut iter = path.components().into_iter();
+        let prefix = iter.next().unwrap();
+        let rootdir = iter.next().unwrap();
+        let rel_path = path.strip_prefix(&prefix)?.strip_prefix(&rootdir)?;
+
+        let drive_letter = match prefix {
+            Component::Prefix(prefix_component) => match prefix_component.kind() {
+                Prefix::Disk(drive_letter) => String::from_utf8(vec![drive_letter]).unwrap(),
+                _ => panic!("not disk"),
+            },
+            _ => panic!("not disk"),
+        };
+        let drive_letter = PathBuf::from(drive_letter);
+        let dest = drive_letter.join(rel_path);
+
+        println!("{}", path.display());
+
+        match fs::metadata(&path) {
+            Ok(_) => println!("exists"),
+            Err(_) => println!("not exists"),
+        }
+
+        tar.append_dir_all(&dest, &path)?;
+    }
+    Ok(())
+}
+
+fn print_usage(program: &str, opts: &Options) {
+    let brief = format!("Usage:\n{} search\n{} backup -f FILE", program, program);
+    print!("{}", opts.usage(&brief));
 }
