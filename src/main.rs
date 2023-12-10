@@ -106,7 +106,7 @@ fn generate_targets2(ctx: &AppContext) -> Result<()> {
         .flatten()
         .collect::<Vec<_>>();
 
-    save_targets(&ctx.target_file, &targets)?;
+    save_targets(&ctx, &targets)?;
 
     Ok(())
 }
@@ -143,12 +143,12 @@ fn generate_targets(search_path: &Path) -> Result<Vec<PathBuf>> {
 
     let mut maybe_parent: Option<&Path> = None;
     let mut save_dirs = vec![];
-    for dir in filtered_paths.into_iter() {
+    for dir in filtered_paths.iter() {
         let is_parent = is_parent(&maybe_parent, &dir);
         if is_parent {
             continue;
         } else {
-            save_dirs.push(dir);
+            save_dirs.push(dir.to_owned());
             maybe_parent = Some(dir.as_path());
         }
     }
