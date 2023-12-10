@@ -1,0 +1,29 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "(Windows) Launch",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceRoot}/target/debug/savedata-backup.exe",
+      "args": [
+        "-o",
+        "hello"
+        // "-namespace",
+        // "default",
+        // "-id",
+        // "1234",
+        // "-address",
+        // "\\\\.\\pipe\\containerd-containerd"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceRoot}",
+      "environment": [
+        // {
+        //   "name": "TTRPC_ADDRESS",
+        //   "value": "\\\\.\\pipe\\containerd-containerd.ttrpc"
+        // }
+      ]
+    }
+  ]
+}
