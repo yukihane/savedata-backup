@@ -18,7 +18,7 @@ struct AppContext {
     target_dir_file: PathBuf,
 }
 
-fn main() -> Result<()> {
+fn determine_command() -> (Option<String>, String, Options) {
     let args = env::args().collect::<Vec<_>>();
     let program = args[0].clone();
 
@@ -36,6 +36,10 @@ fn main() -> Result<()> {
         None
     };
 
+    (command, program, opts)
+}
+
+fn initialize_context() -> Result<AppContext> {
     let config_dir = ProjectDirs::from("com", "yukihane", "savedata-backup")
         .context("Not found: target_file")?
         .config_dir()
@@ -44,11 +48,17 @@ fn main() -> Result<()> {
     let search_dir_file = config_dir.join("search_dir.txt");
     let target_dir_file = config_dir.join("target_dir.txt");
 
-    let ctx = AppContext {
+    Ok(AppContext {
         config_dir,
         search_dir_file,
         target_dir_file,
-    };
+    })
+}
+
+fn main() -> Result<()> {
+    let (command, program, opts) = determine_command();
+
+    let ctx = initialize_context()?;
 
     println!("target_file: {}", &ctx.target_dir_file.display());
 
