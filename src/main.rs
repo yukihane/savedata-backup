@@ -18,7 +18,12 @@ struct AppContext {
     target_dir_file: PathBuf,
 }
 
-fn determine_command() -> (Option<String>, String, Options) {
+enum Command {
+    Search,
+    Backup,
+}
+
+fn determine_command() -> (Option<Command>, String, Options) {
     let args = env::args().collect::<Vec<_>>();
     let program = args[0].clone();
 
@@ -31,7 +36,11 @@ fn determine_command() -> (Option<String>, String, Options) {
     };
 
     let command = if !matches.free.is_empty() {
-        Some(matches.free[0].clone())
+        match matches.free[0] {
+            ref s if s == "search" => Some(Command::Search),
+            ref s if s == "backup" => Some(Command::Backup),
+            _ => None,
+        }
     } else {
         None
     };
@@ -62,10 +71,10 @@ fn main() -> Result<()> {
 
     println!("target_file: {}", &ctx.target_dir_file.display());
 
-    match command.as_ref().map(|e| e.as_str()) {
-        Some("search") => generate_targets2(&ctx)?,
-        Some("backup") => backup(&ctx)?,
-        _ => {
+    match command {
+        Some(Command::Search) => generate_targets2(&ctx)?,
+        Some(Command::Backup) => backup(&ctx)?,
+        None => {
             print_usage(&program, &opts);
             initialize_config_if_not_exists(&ctx)?;
             println!("use: {}", ctx.search_dir_file.display());
