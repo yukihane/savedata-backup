@@ -15,7 +15,7 @@ use walkdir::WalkDir;
 struct AppContext {
     config_dir: PathBuf,
     search_dir_file: PathBuf,
-    target_file: PathBuf,
+    target_dir_file: PathBuf,
 }
 
 fn main() -> Result<()> {
@@ -42,19 +42,19 @@ fn main() -> Result<()> {
         .to_owned();
 
     let search_dir_file = config_dir.join("search_dir.txt");
-    let target_file = config_dir.join("target.txt");
+    let target_dir_file = config_dir.join("target_dir.txt");
 
     let ctx = AppContext {
         config_dir,
         search_dir_file,
-        target_file,
+        target_dir_file,
     };
 
-    println!("target_file: {}", &ctx.target_file.display());
+    println!("target_file: {}", &ctx.target_dir_file.display());
 
     match command.as_ref().map(|e| e.as_str()) {
         Some("search") => generate_targets2(&ctx)?,
-        Some("backup") => backup(&ctx.target_file)?,
+        Some("backup") => backup(&ctx)?,
         _ => {
             print_usage(&program, &opts);
             initialize_config_if_not_exists(&ctx)?;
@@ -163,7 +163,7 @@ fn save_targets(ctx: &AppContext, save_targets: &Vec<PathBuf>) -> Result<()> {
         .write(true)
         .create(true)
         .truncate(true)
-        .open(&ctx.target_file)?;
+        .open(&ctx.target_dir_file)?;
     let mut writer = BufWriter::new(&mut target_file);
 
     save_targets.iter().for_each(|e| {
@@ -190,8 +190,8 @@ fn is_parent(maybe_parent: &Option<&Path>, dir: &Path) -> bool {
 }
 
 /// バックアップ(tarファイル)を生成します。
-fn backup(target_file: &Path) -> Result<()> {
-    let reader = BufReader::new(File::open(target_file)?);
+fn backup(ctx: &AppContext) -> Result<()> {
+    let reader = BufReader::new(File::open(&ctx.target_dir_file)?);
     let paths = reader
         .lines()
         .into_iter()
