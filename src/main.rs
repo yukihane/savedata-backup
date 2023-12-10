@@ -1,7 +1,7 @@
 use std::{
     collections::BTreeSet,
     env,
-    fs::{self, File, OpenOptions},
+    fs::{File, OpenOptions},
     io::{BufRead, BufReader, BufWriter, Write},
     path::{Component, Path, PathBuf, Prefix},
     vec,
@@ -16,6 +16,7 @@ struct AppContext {
     config_dir: PathBuf,
     search_dir_file: PathBuf,
     target_dir_file: PathBuf,
+    target_file_file: PathBuf,
 }
 
 enum Command {
@@ -71,11 +72,13 @@ fn initialize_context() -> Result<AppContext> {
 
     let search_dir_file = config_dir.join("search_dir.txt");
     let target_dir_file = config_dir.join("target_dir.txt");
+    let target_file_file = config_dir.join("target_file.txt");
 
     Ok(AppContext {
         config_dir,
         search_dir_file,
         target_dir_file,
+        target_file_file,
     })
 }
 
@@ -97,6 +100,7 @@ fn initialize_config_if_not_exists(ctx: &AppContext) -> Result<()> {
         writeln!(writer, "{}", document_dir.display()).unwrap();
         writer.flush().unwrap();
     }
+
     Ok(())
 }
 
@@ -176,12 +180,12 @@ fn search_archive_targets(search_path: &Path) -> Result<Vec<PathBuf>> {
 fn save_dirs(ctx: &AppContext, save_targets: &Vec<PathBuf>) -> Result<()> {
     // save_dirs.iter().for_each(|e| println!("{}", e.display()));
 
-    let mut target_file = OpenOptions::new()
+    let mut target_dir_file = OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(true)
         .open(&ctx.target_dir_file)?;
-    let mut writer = BufWriter::new(&mut target_file);
+    let mut writer = BufWriter::new(&mut target_dir_file);
 
     save_targets.iter().for_each(|e| {
         writer.write_all(e.to_string_lossy().as_bytes()).unwrap();
@@ -189,6 +193,17 @@ fn save_dirs(ctx: &AppContext, save_targets: &Vec<PathBuf>) -> Result<()> {
     });
 
     writer.flush().unwrap();
+
+    let target_file_file = &ctx.target_file_file;
+    if !target_file_file.exists() {
+        let mut target_file_file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(target_file_file)?;
+        let mut writer = BufWriter::new(&mut target_file_file);
+        writer.flush().unwrap();
+    }
 
     // save_dirs.iter().for_each(|e| {
     //     writeln!(target_file, "{}", e.display()).unwrap();
@@ -206,9 +221,8 @@ fn is_parent(maybe_parent: &Option<&Path>, dir: &Path) -> bool {
     false
 }
 
-/// バックアップ(tarファイル)を生成します。
-fn backup(ctx: &AppContext) -> Result<()> {
-    let reader = BufReader::new(File::open(&ctx.target_dir_file)?);
+fn read_paths_from_file(file: &Path) -> Result<Vec<String>> {
+    let reader = BufReader::new(File::open(file)?);
     let paths = reader
         .lines()
         .into_iter()
@@ -223,6 +237,27 @@ fn backup(ctx: &AppContext) -> Result<()> {
         })
         .collect::<Vec<_>>();
 
+    Ok(paths)
+}
+
+/// バックアップ(tarファイル)を生成します。
+fn backup(ctx: &AppContext) -> Result<()> {
+    // バックアップ対象ディレクトリを特定
+    let target_dir_file = &ctx.target_dir_file;
+    let dirs = if target_dir_file.exists() {
+        read_paths_from_file(&target_dir_file)?
+    } else {
+        vec![]
+    };
+
+    // バックアップ対象ファイルを特定
+    let target_file_file = &ctx.target_file_file;
+    let files = if target_file_file.exists() {
+        read_paths_from_file(&target_file_file)?
+    } else {
+        vec![]
+    };
+
     let mut tar_file = OpenOptions::new()
         .write(true)
         .create(true)
@@ -230,36 +265,40 @@ fn backup(ctx: &AppContext) -> Result<()> {
         .open("archive.tar")?;
     let mut tar = tar::Builder::new(&mut tar_file);
 
-    // let path =
-    //     PathBuf::from(r"C:\Users\yuki\Documents\AQUAPLUS\Utawarerumono Prelude to the Fallen\Save");
-    for path in paths {
-        let path = Path::new(&path);
+    for path in dirs {
+        let src = Path::new(&path);
+        let dest = get_dest(src)?;
 
-        let mut iter = path.components().into_iter();
-        let prefix = iter.next().unwrap();
-        let rootdir = iter.next().unwrap();
-        let rel_path = path.strip_prefix(&prefix)?.strip_prefix(&rootdir)?;
-
-        let drive_letter = match prefix {
-            Component::Prefix(prefix_component) => match prefix_component.kind() {
-                Prefix::Disk(drive_letter) => String::from_utf8(vec![drive_letter]).unwrap(),
-                _ => panic!("not disk"),
-            },
-            _ => panic!("not disk"),
-        };
-        let drive_letter = PathBuf::from(drive_letter);
-        let dest = drive_letter.join(rel_path);
-
-        println!("{}", path.display());
-
-        match fs::metadata(&path) {
-            Ok(_) => println!("exists"),
-            Err(_) => println!("not exists"),
-        }
-
-        tar.append_dir_all(&dest, &path)?;
+        tar.append_dir_all(&dest, src)?;
     }
+
+    for file in files {
+        let src = Path::new(&file);
+        let dest = get_dest(src)?;
+
+        tar.append_path_with_name(src, &dest)?;
+    }
+
     Ok(())
+}
+
+fn get_dest(src: &Path) -> Result<PathBuf> {
+    let mut iter = src.components().into_iter();
+    let prefix = iter.next().unwrap();
+    let rootdir = iter.next().unwrap();
+    let rel_path = src.strip_prefix(&prefix)?.strip_prefix(&rootdir)?;
+
+    let drive_letter = match prefix {
+        Component::Prefix(prefix_component) => match prefix_component.kind() {
+            Prefix::Disk(drive_letter) => String::from_utf8(vec![drive_letter]).unwrap(),
+            _ => panic!("not disk"),
+        },
+        _ => panic!("not disk"),
+    };
+    let drive_letter = PathBuf::from(drive_letter);
+    let dest = drive_letter.join(rel_path);
+
+    Ok(dest)
 }
 
 fn print_usage(program: &str, opts: &Options) {
