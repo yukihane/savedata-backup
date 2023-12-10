@@ -44,21 +44,21 @@ fn main() -> Result<()> {
     let search_dir_file = config_dir.join("search_dir.txt");
     let target_file = config_dir.join("target.txt");
 
-    let context = AppContext {
+    let ctx = AppContext {
         config_dir,
         search_dir_file,
         target_file,
     };
 
-    println!("target_file: {}", &context.target_file.display());
+    println!("target_file: {}", &ctx.target_file.display());
 
     match command.as_ref().map(|e| e.as_str()) {
-        Some("search") => generate_targets(&context.target_file)?,
-        Some("backup") => backup(&context.target_file)?,
+        Some("search") => generate_targets2(&ctx)?,
+        Some("backup") => backup(&ctx.target_file)?,
         _ => {
             print_usage(&program, &opts);
-            initialize_config_if_not_exists(&context)?;
-            println!("use: {}", context.search_dir_file.display());
+            initialize_config_if_not_exists(&ctx)?;
+            println!("use: {}", ctx.search_dir_file.display());
         }
     }
     return Ok(());
@@ -85,17 +85,35 @@ fn initialize_config_if_not_exists(ctx: &AppContext) -> Result<()> {
     Ok(())
 }
 
-/// バックアップ対象ディレクトリを推定します。
-fn generate_targets(target_file: &Path) -> Result<()> {
-    let config_dir = target_file.parent().context("Not found: config_dir")?;
-    if !config_dir.exists() {
-        std::fs::create_dir_all(config_dir)?;
+fn generate_targets2(ctx: &AppContext) -> Result<()> {
+    let search_dir_file = &ctx.search_dir_file;
+    if !search_dir_file.exists() {
+        return Err(anyhow::anyhow!("Not found: {}", search_dir_file.display()));
     }
+    let reader = BufReader::new(File::open(search_dir_file)?);
+    let search_paths = reader
+        .lines()
+        .into_iter()
+        .map(|e| {
+            let path = e.unwrap();
+            PathBuf::from(&path)
+        })
+        .collect::<Vec<_>>();
 
-    let user_dir = UserDirs::new().context("Not found: user_dir")?;
-    let dir = user_dir.document_dir().context("Not found: document_dir")?;
+    let targets = search_paths
+        .iter()
+        .map(|search_path| generate_targets(&search_path).unwrap())
+        .flatten()
+        .collect::<Vec<_>>();
 
-    let filtered_paths = WalkDir::new(dir)
+    save_targets(&ctx.target_file, &targets)?;
+
+    Ok(())
+}
+
+/// バックアップ対象ディレクトリを推定します。
+fn generate_targets(search_path: &Path) -> Result<Vec<PathBuf>> {
+    let filtered_paths = WalkDir::new(search_path)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter(|e| {
@@ -125,7 +143,7 @@ fn generate_targets(target_file: &Path) -> Result<()> {
 
     let mut maybe_parent: Option<&Path> = None;
     let mut save_dirs = vec![];
-    for dir in filtered_paths.iter() {
+    for dir in filtered_paths.into_iter() {
         let is_parent = is_parent(&maybe_parent, &dir);
         if is_parent {
             continue;
@@ -135,16 +153,20 @@ fn generate_targets(target_file: &Path) -> Result<()> {
         }
     }
 
+    return Ok(save_dirs);
+}
+
+fn save_targets(ctx: &AppContext, save_targets: &Vec<PathBuf>) -> Result<()> {
     // save_dirs.iter().for_each(|e| println!("{}", e.display()));
 
     let mut target_file = OpenOptions::new()
         .write(true)
         .create(true)
         .truncate(true)
-        .open(target_file)?;
+        .open(&ctx.target_file)?;
     let mut writer = BufWriter::new(&mut target_file);
 
-    save_dirs.iter().for_each(|e| {
+    save_targets.iter().for_each(|e| {
         writer.write_all(e.to_string_lossy().as_bytes()).unwrap();
         writer.write_all(b"\n").unwrap();
     });
