@@ -1,12 +1,12 @@
+use crate::context::AppContext;
 use anyhow::Result;
+use glob::glob;
 use std::io::BufRead;
 use std::{
     fs::{File, OpenOptions},
     io::BufReader,
     path::{Component, Path, PathBuf, Prefix},
 };
-
-use crate::context::AppContext;
 
 /// バックアップ(tarファイル)を生成します。
 pub fn backup(ctx: &AppContext) -> Result<()> {
@@ -41,10 +41,11 @@ pub fn backup(ctx: &AppContext) -> Result<()> {
     }
 
     for file in files {
-        let src = Path::new(&file);
-        let dest = get_dest(src)?;
+        glob(&file)?.into_iter().map(|e| e.unwrap()).for_each(|e| {
+            let dest = get_dest(&e).unwrap();
 
-        tar.append_path_with_name(src, &dest)?;
+            tar.append_path_with_name(&e, &dest).unwrap();
+        });
     }
 
     Ok(())
