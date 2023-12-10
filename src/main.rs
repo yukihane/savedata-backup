@@ -12,6 +12,12 @@ use directories::{ProjectDirs, UserDirs};
 use getopts::Options;
 use walkdir::WalkDir;
 
+struct AppContext {
+    config_dir: PathBuf,
+    search_dir_file: PathBuf,
+    target_file: PathBuf,
+}
+
 fn main() -> Result<()> {
     let args = env::args().collect::<Vec<_>>();
     let program = args[0].clone();
@@ -30,21 +36,53 @@ fn main() -> Result<()> {
         None
     };
 
-    let target_file = ProjectDirs::from("com", "yukihane", "savedata-backup")
+    let config_dir = ProjectDirs::from("com", "yukihane", "savedata-backup")
         .context("Not found: target_file")?
         .config_dir()
-        .join("config.txt");
+        .to_owned();
 
-    println!("target_file: {}", target_file.display());
+    let search_dir_file = config_dir.join("search_dir.txt");
+    let target_file = config_dir.join("target.txt");
+
+    let context = AppContext {
+        config_dir,
+        search_dir_file,
+        target_file,
+    };
+
+    println!("target_file: {}", &context.target_file.display());
 
     match command.as_ref().map(|e| e.as_str()) {
-        Some("search") => generate_targets(&target_file)?,
-        Some("backup") => backup(&target_file)?,
+        Some("search") => generate_targets(&context.target_file)?,
+        Some("backup") => backup(&context.target_file)?,
         _ => {
             print_usage(&program, &opts);
+            initialize_config_if_not_exists(&context)?;
+            println!("use: {}", context.search_dir_file.display());
         }
     }
     return Ok(());
+}
+
+fn initialize_config_if_not_exists(ctx: &AppContext) -> Result<()> {
+    let config_dir = &ctx.config_dir;
+    if !config_dir.exists() {
+        std::fs::create_dir_all(config_dir)?;
+    }
+    let search_dir_file = &ctx.search_dir_file;
+    if !search_dir_file.exists() {
+        let mut search_dir_file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(search_dir_file)?;
+        let mut writer = BufWriter::new(&mut search_dir_file);
+        let user_dir = UserDirs::new().context("Not found: user_dir")?;
+        let document_dir = user_dir.document_dir().context("Not found: document_dir")?;
+        writeln!(writer, "{}", document_dir.display()).unwrap();
+        writer.flush().unwrap();
+    }
+    Ok(())
 }
 
 fn print_usage(program: &str, opts: &Options) {
