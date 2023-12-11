@@ -1,0 +1,16 @@
+== バックアップ対象検討
+
+https://torutk.hatenablog.jp/entry/20110604/p1[Windowsのディレクトリ構成ガイドライン - torutkのブログ] より。
+
+`C:\Uses\<ユーザー名>` 以下について、
+
+* `Roaming` はバックアップ対象候補になりそう
+* `Local`, `LocalLow` は不要っぽそう
+
+https://www.eukleia.co.jp/eushully/support/html/spdl_vis.html#sap2_1[バーチャルストア]。
+
+* `C:\Users\<ユーザー名>\AppData\Local\VirtualStore\` も検索対象にした方が良い？
+
+== ゲーム個別
+
+https://www.eukleia.co.jp/eushully/support/html/spdl_e10.html[姫狩りダンジョンマイスター]: `C:\Users\ [ユーザー名] \AppData\Local\Eushully\姫狩りダンジョンマイスター\SAVE`

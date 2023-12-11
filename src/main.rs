@@ -1,23 +1,24 @@
 mod backup;
+mod check;
 mod context;
 mod search;
-
+use anyhow::{Context, Result};
+use backup::backup;
+use check::check;
+use context::AppContext;
+use directories::{ProjectDirs, UserDirs};
+use getopts::Options;
+use search::save_archive_candidates;
 use std::{
     env,
     fs::OpenOptions,
     io::{BufWriter, Write},
 };
 
-use anyhow::{Context, Result};
-use backup::backup;
-use context::AppContext;
-use directories::{ProjectDirs, UserDirs};
-use getopts::Options;
-use search::save_archive_candidates;
-
 enum Command {
     Search,
     Backup,
+    Check,
 }
 
 fn main() -> Result<()> {
@@ -28,6 +29,7 @@ fn main() -> Result<()> {
     match command {
         Some(Command::Search) => save_archive_candidates(&ctx)?,
         Some(Command::Backup) => backup(&ctx)?,
+        Some(Command::Check) => check(&ctx)?,
         None => {
             initialize_config_if_not_exists(&ctx)?;
             println!("use: {}", ctx.search_dir_file.display());
@@ -52,6 +54,7 @@ fn determine_command() -> Option<Command> {
         match matches.free[0] {
             ref s if s == "search" => Some(Command::Search),
             ref s if s == "backup" => Some(Command::Backup),
+            ref s if s == "check" => Some(Command::Check),
             _ => None,
         }
     } else {
