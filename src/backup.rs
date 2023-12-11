@@ -51,7 +51,7 @@ pub fn backup(ctx: &AppContext) -> Result<()> {
     Ok(())
 }
 
-fn read_paths_from_file(file: &Path) -> Result<Vec<String>> {
+pub(crate) fn read_paths_from_file(file: &Path) -> Result<Vec<String>> {
     let reader = BufReader::new(File::open(file)?);
     let paths = reader
         .lines()
