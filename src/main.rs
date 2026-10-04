@@ -1,6 +1,7 @@
 mod backup;
 mod check;
 mod context;
+mod inspect;
 mod search;
 use anyhow::{Context, Result};
 use backup::backup;
@@ -8,17 +9,20 @@ use check::check;
 use context::AppContext;
 use directories::{ProjectDirs, UserDirs};
 use getopts::Options;
+use inspect::inspect_executable;
 use search::save_archive_candidates;
 use std::{
     env,
     fs::OpenOptions,
     io::{BufWriter, Write},
+    path::PathBuf,
 };
 
 enum Command {
     Search,
     Backup,
     Check,
+    Inspect(PathBuf),
 }
 
 fn main() -> Result<()> {
@@ -30,6 +34,7 @@ fn main() -> Result<()> {
         Some(Command::Search) => save_archive_candidates(&ctx)?,
         Some(Command::Backup) => backup(&ctx)?,
         Some(Command::Check) => check(&ctx)?,
+        Some(Command::Inspect(path)) => inspect_executable(&path)?,
         None => {
             initialize_config_if_not_exists(&ctx)?;
             println!("use: {}", ctx.search_dir_file.display());
@@ -55,6 +60,12 @@ fn determine_command() -> Option<Command> {
             ref s if s == "search" => Some(Command::Search),
             ref s if s == "backup" => Some(Command::Backup),
             ref s if s == "check" => Some(Command::Check),
+            ref s if s == "inspect" => {
+                if matches.free.len() != 2 {
+                    panic!("Usage: {} inspect FILE", program);
+                }
+                Some(Command::Inspect(PathBuf::from(&matches.free[1])))
+            }
             _ => None,
         }
     } else {
@@ -104,6 +115,9 @@ fn initialize_config_if_not_exists(ctx: &AppContext) -> Result<()> {
 }
 
 fn print_usage(program: &str, opts: &Options) {
-    let brief = format!("Usage:\n{} search\n{} backup -f FILE", program, program);
+    let brief = format!(
+        "Usage:\n{} search\n{} inspect FILE\n{} backup\n{} check",
+        program, program, program, program
+    );
     print!("{}", opts.usage(&brief));
 }
